@@ -40,6 +40,17 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Dein Standort wird für die Turn-by-Turn Navigation benötigt.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Dein Standort wird für die Navigation im Hintergrund benötigt.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Dein Standort wird für die Navigation im Hintergrund benötigt.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>audio</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

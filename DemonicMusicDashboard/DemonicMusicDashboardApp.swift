@@ -17,7 +17,7 @@ struct DemonicMusicDashboardApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppTabView()
         }
     }
 }

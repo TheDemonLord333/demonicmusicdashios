@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var spotify = SpotifyService()
+    @ObservedObject var spotify: SpotifyService
+    @State private var isFullscreen = false
 
     var body: some View {
         ZStack {
@@ -27,11 +28,49 @@ struct ContentView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: spotify.isAuthorized)
+
+            // Vollbild-Button (nur wenn angemeldet)
+            if spotify.isAuthorized && !isFullscreen {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: { withAnimation { isFullscreen = true } }) {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(DemonicColor.textSecondary)
+                                .padding(8)
+                                .background(Circle().fill(DemonicColor.backgroundCard.opacity(0.85)))
+                        }
+                        .padding(.trailing, 12)
+                        .padding(.top, 8)
+                        .accessibilityLabel("Vollbild")
+                    }
+                    Spacer()
+                }
+            }
+
+            // Vollbild-Verlassen-Button
+            if isFullscreen {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: { withAnimation { isFullscreen = false } }) {
+                            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(DemonicColor.textSecondary)
+                                .padding(10)
+                                .background(Circle().fill(DemonicColor.backgroundCard.opacity(0.85)))
+                        }
+                        .padding(.trailing, 16)
+                        .accessibilityLabel("Vollbild verlassen")
+                    }
+                    Spacer()
+                }
+                .padding(.top, 8)
+            }
         }
+        .toolbar(isFullscreen ? .hidden : .visible, for: .tabBar)
         .preferredColorScheme(.dark)
-        .onOpenURL { url in
-            spotify.handleCallback(url: url)
-        }
     }
 }
 
@@ -362,5 +401,5 @@ struct AmbientBlobs: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(spotify: SpotifyService())
 }
