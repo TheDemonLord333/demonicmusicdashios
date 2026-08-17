@@ -255,7 +255,7 @@ final class NavigationManager: NSObject, ObservableObject {
         checkOffRoute(location: location)
     }
 
-    private func advanceToNextStep(steps: [MKRouteStep]) {
+    private func advanceToNextStep(steps: [MKRoute.Step]) {
         let next = currentStepIndex + 1
         if next >= steps.count {
             // Arrived
@@ -277,7 +277,7 @@ final class NavigationManager: NSObject, ObservableObject {
 
     // MARK: - Step Distance Announcements
 
-    private func triggerAnnouncements(step: MKRouteStep, stepIdx: Int, distance: CLLocationDistance) {
+    private func triggerAnnouncements(step: MKRoute.Step, stepIdx: Int, distance: CLLocationDistance) {
         let thresholds: [(CLLocationDistance, String)] = [
             (500, "500 Metern"),
             (200, "200 Metern"),
@@ -339,19 +339,19 @@ final class NavigationManager: NSObject, ObservableObject {
 
     // MARK: - Instruction Helpers
 
-    private func updateInstruction(step: MKRouteStep) {
+    private func updateInstruction(step: MKRoute.Step) {
         currentInstruction = step.instructions.isEmpty ? turnDirectionText(maneuver: step.maneuver) : step.instructions
         maneuverSymbol = symbolForManeuver(step.maneuver)
     }
 
-    private func describeStep(step: MKRouteStep, withDistance dist: CLLocationDistance?) -> String {
+    private func describeStep(step: MKRoute.Step, withDistance dist: CLLocationDistance?) -> String {
         let direction = turnDirectionText(maneuver: step.maneuver)
         let distStr = dist.map { formatDistance($0) + " " } ?? ""
         let street = step.instructions.isEmpty ? "" : " auf \(step.instructions)"
         return "\(distStr)\(direction)\(street)."
     }
 
-    private func turnDirectionText(maneuver: MKDirections.ManeuverType) -> String {
+    private func turnDirectionText(maneuver: MKRoute.Step.ManeuverType) -> String {
         switch maneuver {
         case .turnLeft:        return "links abbiegen"
         case .turnRight:       return "rechts abbiegen"
@@ -372,7 +372,7 @@ final class NavigationManager: NSObject, ObservableObject {
         }
     }
 
-    private func symbolForManeuver(_ m: MKDirections.ManeuverType) -> String {
+    private func symbolForManeuver(_ m: MKRoute.Step.ManeuverType) -> String {
         switch m {
         case .turnLeft, .turnSharpLeft:   return "arrow.turn.up.left"
         case .turnRight, .turnSharpRight: return "arrow.turn.up.right"
