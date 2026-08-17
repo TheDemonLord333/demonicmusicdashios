@@ -288,7 +288,7 @@ final class NavigationManager: NSObject, ObservableObject {
             let key = "\(stepIdx)-\(Int(threshold))"
             if distance <= threshold + 40 && distance > threshold - 40 && !announcedKeys.contains(key) {
                 announcedKeys.insert(key)
-                let direction = turnDirectionText(maneuver: step.maneuver)
+                let direction = directionText(for: step.instructions)
                 let street = step.instructions.isEmpty ? "" : " auf \(step.instructions)"
                 announce("In \(label) \(direction)\(street).")
                 return
@@ -298,7 +298,7 @@ final class NavigationManager: NSObject, ObservableObject {
         let imm = "\(stepIdx)-immediate"
         if distance < 20 && !announcedKeys.contains(imm) {
             announcedKeys.insert(imm)
-            announce("Jetzt \(turnDirectionText(maneuver: step.maneuver)).")
+            announce("Jetzt \(directionText(for: step.instructions)).")
         }
     }
 
@@ -340,49 +340,46 @@ final class NavigationManager: NSObject, ObservableObject {
     // MARK: - Instruction Helpers
 
     private func updateInstruction(step: MKRoute.Step) {
-        currentInstruction = step.instructions.isEmpty ? turnDirectionText(maneuver: step.maneuver) : step.instructions
-        maneuverSymbol = symbolForManeuver(step.maneuver)
+        let text = step.instructions.isEmpty ? "Geradeaus fahren" : step.instructions
+        currentInstruction = text
+        maneuverSymbol = symbolForInstruction(text)
     }
 
     private func describeStep(step: MKRoute.Step, withDistance dist: CLLocationDistance?) -> String {
-        let direction = turnDirectionText(maneuver: step.maneuver)
         let distStr = dist.map { formatDistance($0) + " " } ?? ""
-        let street = step.instructions.isEmpty ? "" : " auf \(step.instructions)"
-        return "\(distStr)\(direction)\(street)."
+        let text = step.instructions.isEmpty ? "geradeaus fahren" : step.instructions
+        return "\(distStr)\(text)."
     }
 
-    private func turnDirectionText(maneuver: MKRoute.Step.ManeuverType) -> String {
-        switch maneuver {
-        case .turnLeft:        return "links abbiegen"
-        case .turnRight:       return "rechts abbiegen"
-        case .turnSharpLeft:   return "scharf links abbiegen"
-        case .turnSharpRight:  return "scharf rechts abbiegen"
-        case .turnSlightLeft:  return "leicht links halten"
-        case .turnSlightRight: return "leicht rechts halten"
-        case .uturnLeft, .uturnRight: return "wenden"
-        case .keepLeft:        return "links halten"
-        case .keepRight:       return "rechts halten"
-        case .rampLeft:        return "links auf die Auffahrt"
-        case .rampRight:       return "rechts auf die Auffahrt"
-        case .merge:           return "einfädeln"
-        case .circle:          return "in den Kreisverkehr einfahren"
-        case .ferry, .ferryTrain: return "Fähre nehmen"
-        case .none:            return "geradeaus fahren"
-        default:               return "geradeaus fahren"
-        }
+    /// Derives a turn-direction phrase from the instruction text (German keywords).
+    private func directionText(for instruction: String) -> String {
+        let low = instruction.lowercased()
+        if low.contains("wend") || low.contains("umkehr") { return "wenden" }
+        if low.contains("scharf links")  { return "scharf links abbiegen" }
+        if low.contains("scharf rechts") { return "scharf rechts abbiegen" }
+        if low.contains("leicht links") || low.contains("halb links") { return "leicht links halten" }
+        if low.contains("leicht rechts") || low.contains("halb rechts") { return "leicht rechts halten" }
+        if low.contains("links")  { return "links abbiegen" }
+        if low.contains("rechts") { return "rechts abbiegen" }
+        if low.contains("kreisel") || low.contains("kreisverkehr") { return "in den Kreisverkehr einfahren" }
+        if low.contains("fähre") || low.contains("ferry") { return "Fähre nehmen" }
+        if low.contains("einfädeln") || low.contains("einfahren") { return "einfädeln" }
+        return "geradeaus fahren"
     }
 
-    private func symbolForManeuver(_ m: MKRoute.Step.ManeuverType) -> String {
-        switch m {
-        case .turnLeft, .turnSharpLeft:   return "arrow.turn.up.left"
-        case .turnRight, .turnSharpRight: return "arrow.turn.up.right"
-        case .turnSlightLeft, .keepLeft, .rampLeft:  return "arrow.up.left"
-        case .turnSlightRight, .keepRight, .rampRight: return "arrow.up.right"
-        case .uturnLeft, .uturnRight:     return "arrow.uturn.left"
-        case .merge:                      return "arrow.merge"
-        case .circle:                     return "arrow.circlepath"
-        default:                          return "arrow.up"
-        }
+    /// Maps an instruction string to an SF Symbol name.
+    private func symbolForInstruction(_ instruction: String) -> String {
+        let low = instruction.lowercased()
+        if low.contains("wend") || low.contains("umkehr") { return "arrow.uturn.left" }
+        if low.contains("scharf links") || low.contains("links abbiegen") || low.contains("links ab") { return "arrow.turn.up.left" }
+        if low.contains("scharf rechts") || low.contains("rechts abbiegen") || low.contains("rechts ab") { return "arrow.turn.up.right" }
+        if low.contains("leicht links") || low.contains("halb links") { return "arrow.up.left" }
+        if low.contains("leicht rechts") || low.contains("halb rechts") { return "arrow.up.right" }
+        if low.contains("links") { return "arrow.turn.up.left" }
+        if low.contains("rechts") { return "arrow.turn.up.right" }
+        if low.contains("kreisel") || low.contains("kreisverkehr") { return "arrow.circlepath" }
+        if low.contains("einfädeln") { return "arrow.merge" }
+        return "arrow.up"
     }
 
     func formatDistance(_ meters: CLLocationDistance) -> String {
