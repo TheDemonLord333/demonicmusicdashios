@@ -4,13 +4,13 @@ import SwiftUI
 // Root-View: Verwaltet die drei Tabs und die gemeinsam genutzten Services.
 
 struct AppTabView: View {
-    @StateObject private var spotify = SpotifyService()
+    @StateObject private var nowPlaying = NowPlayingService()
     @StateObject private var navManager = NavigationManager()
 
     var body: some View {
         TabView {
             // MARK: Tab 1 – Musik
-            MusicTabWrapper(spotify: spotify)
+            ContentView(nowPlaying: nowPlaying)
                 .tabItem {
                     Label("Musik", systemImage: "music.note")
                 }
@@ -24,7 +24,7 @@ struct AppTabView: View {
                 .tag(1)
 
             // MARK: Tab 3 – Mix
-            MixTabView(spotify: spotify, nav: navManager)
+            MixTabView(nowPlaying: nowPlaying, nav: navManager)
                 .tabItem {
                     Label("Mix", systemImage: "rectangle.split.2x1.fill")
                 }
@@ -33,18 +33,7 @@ struct AppTabView: View {
         .tint(DemonicColor.spotifyGreen)
         .preferredColorScheme(.dark)
         .onOpenURL { url in
-            spotify.handleCallback(url: url)
+            nowPlaying.handleCallback(url: url)
         }
-    }
-}
-
-// MARK: - MusicTabWrapper
-// Wraps ContentView (which still handles its own fullscreen state).
-
-struct MusicTabWrapper: View {
-    @ObservedObject var spotify: SpotifyService
-
-    var body: some View {
-        ContentView(spotify: spotify)
     }
 }

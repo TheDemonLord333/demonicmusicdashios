@@ -103,9 +103,10 @@ struct DemonicProgressBar: View {
 // MARK: - Track Info (Landscape: right panel)
 
 struct LandscapeTrackInfo: View {
-    let track: SpotifyTrack
+    let track: UnifiedTrack
     let liveProgressMs: Int
     let isSaved: Bool
+    var canSave: Bool = true
     let onToggleSaved: () -> Void
 
     var progress: Double {
@@ -117,19 +118,13 @@ struct LandscapeTrackInfo: View {
         VStack(alignment: .leading, spacing: 20) {
             Spacer()
 
-            // Playing indicator + Like button
+            // Quellen-Badge + Like-Button
             HStack(spacing: 8) {
-                ForEach(0..<4) { i in
-                    PlayingBar(delay: Double(i) * 0.15, isPlaying: track.isPlaying)
-                }
-                Text(track.isPlaying ? "SPIELT GERADE" : "PAUSIERT")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(track.isPlaying ? DemonicColor.demonGreen : DemonicColor.textMuted)
-                    .tracking(2)
-
+                MusicSourceBadge(source: track.source)
                 Spacer()
-
-                LikeButton(isSaved: isSaved, action: onToggleSaved)
+                if canSave {
+                    LikeButton(isSaved: isSaved, action: onToggleSaved)
+                }
             }
 
             // Title
@@ -178,9 +173,10 @@ struct LandscapeTrackInfo: View {
 // MARK: - Track Info (Portrait: below cover)
 
 struct PortraitTrackInfo: View {
-    let track: SpotifyTrack
+    let track: UnifiedTrack
     let liveProgressMs: Int
     let isSaved: Bool
+    var canSave: Bool = true
     let onToggleSaved: () -> Void
 
     var progress: Double {
@@ -190,20 +186,15 @@ struct PortraitTrackInfo: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            // Playing bars + Like button
+            // Quellen-Badge + Like-Button
             HStack(spacing: 6) {
-                ForEach(0..<4) { i in
-                    PlayingBar(delay: Double(i) * 0.15, isPlaying: track.isPlaying)
-                }
-                Text(track.isPlaying ? "SPIELT GERADE" : "PAUSIERT")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(track.isPlaying ? DemonicColor.demonGreen : DemonicColor.textMuted)
-                    .tracking(2)
-
+                MusicSourceBadge(source: track.source)
                 Spacer()
-
-                LikeButton(isSaved: isSaved, action: onToggleSaved)
+                if canSave {
+                    LikeButton(isSaved: isSaved, action: onToggleSaved)
+                }
             }
+            .padding(.horizontal, 4)
 
             // Title
             Text(track.title)
@@ -245,6 +236,30 @@ struct PortraitTrackInfo: View {
     private func formatTime(_ ms: Int) -> String {
         let seconds = ms / 1000
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+// MARK: - Quellen-Badge
+
+struct MusicSourceBadge: View {
+    let source: UnifiedTrack.MusicSource
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: source.sfSymbol)
+                .font(.system(size: 10, weight: .bold))
+            Text(source.displayName)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .tracking(1)
+        }
+        .foregroundColor(Color(hex: source.badgeColorHex))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(Color(hex: source.badgeColorHex).opacity(0.15))
+                .overlay(Capsule().stroke(Color(hex: source.badgeColorHex).opacity(0.35), lineWidth: 1))
+        )
     }
 }
 

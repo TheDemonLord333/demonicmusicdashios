@@ -7,7 +7,7 @@ import MapKit
 // Querformat: Navigation links, Musik rechts, Batterie auf der Trennlinie.
 
 struct MixTabView: View {
-    @ObservedObject var spotify: SpotifyService
+    @ObservedObject var nowPlaying: NowPlayingService
     @ObservedObject var nav: NavigationManager
     @StateObject private var battery = BatteryMonitor()
     @State private var isFullscreen = false
@@ -181,75 +181,71 @@ struct MixTabView: View {
 
     @ViewBuilder
     private func mixMusicSection(isLandscape: Bool) -> some View {
-        if spotify.isAuthorized {
-            if let track = spotify.currentTrack {
-                // Portrait und Landscape im Mix: Cover → Titel → Künstler → Progress
-                ScrollView {
-                    VStack(spacing: 14) {
-                        // Cover
-                        AlbumArtSquareView(url: track.albumArtURL, size: isLandscape ? 120 : 160)
-                            .padding(.top, 12)
+        if let track = nowPlaying.currentTrack {
+            // Track erkannt (Spotify, Apple Music, Andere)
+            ScrollView {
+                VStack(spacing: 14) {
+                    // Cover
+                    AlbumArtSquareView(
+                        url: track.albumArtURL,
+                        size: isLandscape ? 120 : 160,
+                        image: track.albumArtImage
+                    )
+                    .padding(.top, 12)
 
-                        // Titel
-                        Text(track.title)
-                            .font(.system(size: isLandscape ? 16 : 20, weight: .black))
-                            .foregroundStyle(DemonicGradient.titleGradient)
+                    // Quellen-Badge
+                    MusicSourceBadge(source: track.source)
+
+                    // Titel
+                    Text(track.title)
+                        .font(.system(size: isLandscape ? 16 : 20, weight: .black))
+                        .foregroundStyle(DemonicGradient.titleGradient)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .shadow(color: DemonicColor.glowGreen, radius: 6)
+                        .padding(.horizontal, 12)
+
+                    // Künstler
+                    HStack(spacing: 5) {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(DemonicColor.demonPurple)
+                        Text(track.artist)
+                            .font(.system(size: isLandscape ? 13 : 15, weight: .semibold))
+                            .foregroundColor(DemonicColor.textSecondary)
                             .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .shadow(color: DemonicColor.glowGreen, radius: 6)
-                            .padding(.horizontal, 12)
+                    }
 
-                        // Künstler
-                        HStack(spacing: 5) {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 11))
-                                .foregroundColor(DemonicColor.demonPurple)
-                            Text(track.artist)
-                                .font(.system(size: isLandscape ? 13 : 15, weight: .semibold))
-                                .foregroundColor(DemonicColor.textSecondary)
-                                .multilineTextAlignment(.center)
+                    // Zeitstrahl
+                    VStack(spacing: 4) {
+                        let progress = track.durationMs > 0
+                            ? Double(nowPlaying.liveProgressMs) / Double(track.durationMs)
+                            : 0
+                        DemonicProgressBar(progress: progress)
+                            .padding(.horizontal, 16)
+                        HStack {
+                            Text(formatTime(nowPlaying.liveProgressMs))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(DemonicColor.textMuted)
+                            Spacer()
+                            Text(formatTime(track.durationMs))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(DemonicColor.textMuted)
                         }
+                        .padding(.horizontal, 20)
+                    }
 
-                        // Zeitstrahl (unter Titel und Künstler)
-                        VStack(spacing: 4) {
-                            let progress = track.durationMs > 0
-                                ? Double(spotify.liveProgressMs) / Double(track.durationMs)
-                                : 0
-                            DemonicProgressBar(progress: progress)
-                                .padding(.horizontal, 16)
-                            HStack {
-                                Text(formatTime(spotify.liveProgressMs))
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundColor(DemonicColor.textMuted)
-                                Spacer()
-                                Text(formatTime(track.durationMs))
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundColor(DemonicColor.textMuted)
-                            }
-                            .padding(.horizontal, 20)
-                        }
-
-                        // Like-Button
-                        LikeButton(isSaved: spotify.isSaved) {
-                            Task { await spotify.toggleSaved() }
+                    // Like-Button nur für Spotify
+                    if track.source == .spotify {
+                        LikeButton(isSaved: nowPlaying.isSaved) {
+                            Task { await nowPlaying.toggleSaved() }
                         }
                         .padding(.bottom, 12)
                     }
                 }
-            } else {
-                // Nichts spielt
-                VStack(spacing: 10) {
-                    Image(systemName: "waveform.slash")
-                        .font(.system(size: 32))
-                        .foregroundStyle(DemonicGradient.titleGradient)
-                    Text("Nichts spielt gerade")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(DemonicColor.textSecondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        } else {
-            // Nicht angemeldet
+        } else if !nowPlaying.spotify.isAuthorized {
+            // Spotify nicht angemeldet und nichts anderes spielt
             VStack(spacing: 12) {
                 Image(systemName: "music.note.house")
                     .font(.system(size: 36))
@@ -257,9 +253,21 @@ struct MixTabView: View {
                 Text("Spotify nicht verbunden")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(DemonicColor.textSecondary)
-                Text("Im Musik-Tab anmelden")
+                Text("Im Musik-Tab anmelden oder\nandere Musik-App starten")
                     .font(.system(size: 12))
                     .foregroundColor(DemonicColor.textMuted)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            // Angemeldet aber nichts spielt
+            VStack(spacing: 10) {
+                Image(systemName: "waveform.slash")
+                    .font(.system(size: 32))
+                    .foregroundStyle(DemonicGradient.titleGradient)
+                Text("Nichts spielt gerade")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(DemonicColor.textSecondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

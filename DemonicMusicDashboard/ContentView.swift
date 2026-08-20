@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @ObservedObject var spotify: SpotifyService
+    @ObservedObject var nowPlaying: NowPlayingService
     @State private var isFullscreen = false
 
     var body: some View {
@@ -15,22 +15,22 @@ struct ContentView: View {
             GeometryReader { geo in
                 let isLandscape = geo.size.width > geo.size.height
 
-                if spotify.isAuthorized {
+                if nowPlaying.spotify.isAuthorized {
                     if isLandscape {
-                        LandscapeLayout(spotify: spotify)
+                        LandscapeLayout(nowPlaying: nowPlaying)
                             .transition(.opacity)
                     } else {
-                        PortraitLayout(spotify: spotify)
+                        PortraitLayout(nowPlaying: nowPlaying)
                             .transition(.opacity)
                     }
                 } else {
-                    LoginView(spotify: spotify)
+                    LoginView(spotify: nowPlaying.spotify)
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: spotify.isAuthorized)
+            .animation(.easeInOut(duration: 0.3), value: nowPlaying.spotify.isAuthorized)
 
             // Vollbild-Button (nur wenn angemeldet)
-            if spotify.isAuthorized && !isFullscreen {
+            if nowPlaying.spotify.isAuthorized && !isFullscreen {
                 VStack {
                     HStack {
                         Spacer()
@@ -77,7 +77,7 @@ struct ContentView: View {
 // MARK: - Landscape Layout
 
 struct LandscapeLayout: View {
-    @ObservedObject var spotify: SpotifyService
+    @ObservedObject var nowPlaying: NowPlayingService
     @StateObject private var battery = BatteryMonitor()
 
     var body: some View {
@@ -92,8 +92,8 @@ struct LandscapeLayout: View {
 
             // MITTE: Album Art
             ZStack {
-                if let track = spotify.currentTrack {
-                    AlbumArtView(url: track.albumArtURL, size: 220)
+                if let track = nowPlaying.currentTrack {
+                    AlbumArtView(url: track.albumArtURL, size: 220, image: track.albumArtImage)
                         .transition(.scale.combined(with: .opacity))
                 } else {
                     AlbumArtView(url: nil, size: 220)
@@ -112,12 +112,13 @@ struct LandscapeLayout: View {
                     )
                     .shadow(color: DemonicColor.glowPurple, radius: 30)
 
-                if let track = spotify.currentTrack {
+                if let track = nowPlaying.currentTrack {
                     LandscapeTrackInfo(
                         track: track,
-                        liveProgressMs: spotify.liveProgressMs,
-                        isSaved: spotify.isSaved,
-                        onToggleSaved: { Task { await spotify.toggleSaved() } }
+                        liveProgressMs: nowPlaying.liveProgressMs,
+                        isSaved: nowPlaying.isSaved,
+                        canSave: track.source == .spotify,
+                        onToggleSaved: { Task { await nowPlaying.toggleSaved() } }
                     )
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 } else {
@@ -128,14 +129,14 @@ struct LandscapeLayout: View {
             .padding(.trailing, 40)
             .padding(.vertical, 24)
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spotify.currentTrack?.title)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: nowPlaying.currentTrack?.title)
     }
 }
 
 // MARK: - Portrait Layout
 
 struct PortraitLayout: View {
-    @ObservedObject var spotify: SpotifyService
+    @ObservedObject var nowPlaying: NowPlayingService
     @StateObject private var battery = BatteryMonitor()
 
     var body: some View {
@@ -146,8 +147,8 @@ struct PortraitLayout: View {
 
                 // TOP: Album Art
                 ZStack {
-                    if let track = spotify.currentTrack {
-                        AlbumArtSquareView(url: track.albumArtURL, size: 280)
+                    if let track = nowPlaying.currentTrack {
+                        AlbumArtSquareView(url: track.albumArtURL, size: 280, image: track.albumArtImage)
                             .transition(.scale.combined(with: .opacity))
                     } else {
                         AlbumArtSquareView(url: nil, size: 280)
@@ -165,12 +166,13 @@ struct PortraitLayout: View {
                         )
                         .shadow(color: DemonicColor.glowPurple, radius: 24)
 
-                    if let track = spotify.currentTrack {
+                    if let track = nowPlaying.currentTrack {
                         PortraitTrackInfo(
                             track: track,
-                            liveProgressMs: spotify.liveProgressMs,
-                            isSaved: spotify.isSaved,
-                            onToggleSaved: { Task { await spotify.toggleSaved() } }
+                            liveProgressMs: nowPlaying.liveProgressMs,
+                            isSaved: nowPlaying.isSaved,
+                            canSave: track.source == .spotify,
+                            onToggleSaved: { Task { await nowPlaying.toggleSaved() } }
                         )
                         .padding(.vertical, 24)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -185,7 +187,7 @@ struct PortraitLayout: View {
                 HorizontalBatteryView(monitor: battery)
 
                 // Logout button
-                Button(action: { spotify.logout() }) {
+                Button(action: { nowPlaying.spotify.logout() }) {
                     Label("Abmelden", systemImage: "rectangle.portrait.and.arrow.right")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(DemonicColor.textMuted)
@@ -194,7 +196,7 @@ struct PortraitLayout: View {
             }
             .padding(.top, 20)
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spotify.currentTrack?.title)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: nowPlaying.currentTrack?.title)
     }
 }
 
@@ -401,5 +403,5 @@ struct AmbientBlobs: View {
 }
 
 #Preview {
-    ContentView(spotify: SpotifyService())
+    ContentView(nowPlaying: NowPlayingService())
 }

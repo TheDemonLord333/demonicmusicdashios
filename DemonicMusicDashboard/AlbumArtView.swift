@@ -3,9 +3,10 @@ import SwiftUI
 struct AlbumArtView: View {
     let url: URL?
     let size: CGFloat
+    var image: UIImage? = nil   // direktes UIImage (z.B. von MediaPlayer)
+
     @State private var rotationAngle: Double = 0
     @State private var imageData: Data?
-    @State private var isLoading = false
 
     var body: some View {
         ZStack {
@@ -24,8 +25,8 @@ struct AlbumArtView: View {
 
             // Album art circle
             Group {
-                if let data = imageData, let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
+                if let img = resolvedImage() {
+                    Image(uiImage: img)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } else {
@@ -63,16 +64,20 @@ struct AlbumArtView: View {
         }
     }
 
+    private func resolvedImage() -> UIImage? {
+        if let img = image { return img }
+        if let data = imageData { return UIImage(data: data) }
+        return nil
+    }
+
     private func loadImage() async {
         guard let url else { imageData = nil; return }
-        isLoading = true
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             await MainActor.run { imageData = data }
         } catch {
             await MainActor.run { imageData = nil }
         }
-        isLoading = false
     }
 }
 
@@ -81,6 +86,8 @@ struct AlbumArtView: View {
 struct AlbumArtSquareView: View {
     let url: URL?
     let size: CGFloat
+    var image: UIImage? = nil   // direktes UIImage (z.B. von MediaPlayer)
+
     @State private var imageData: Data?
     @State private var shimmer = false
 
@@ -99,8 +106,8 @@ struct AlbumArtSquareView: View {
                 }
 
             Group {
-                if let data = imageData, let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
+                if let img = resolvedImage() {
+                    Image(uiImage: img)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } else {
@@ -132,6 +139,12 @@ struct AlbumArtSquareView: View {
         .task(id: url) {
             await loadImage()
         }
+    }
+
+    private func resolvedImage() -> UIImage? {
+        if let img = image { return img }
+        if let data = imageData { return UIImage(data: data) }
+        return nil
     }
 
     private func loadImage() async {
