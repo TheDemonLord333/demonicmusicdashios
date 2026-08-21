@@ -40,6 +40,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 	</dict>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Damit Apple Music-Tracks im Dashboard angezeigt werden können.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Dein Standort wird für die Turn-by-Turn Navigation benötigt.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

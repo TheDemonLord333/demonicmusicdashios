@@ -25,7 +25,7 @@ final class NowPlayingService: ObservableObject {
         self.spotify      = SpotifyService()
         self.mediaPlayer  = MediaPlayerService()
 
-        mediaPlayer.start()
+        mediaPlayer.requestAuthorizationAndStart()
         setupBindings()
     }
 
@@ -58,7 +58,7 @@ final class NowPlayingService: ObservableObject {
                 self.liveProgressMs = spotifyMs
 
             } else if let mt = mpTrack {
-                // Andere App spielt (Apple Music, Amazon Music, …)
+                // Apple Music spielt
                 self.currentTrack = mt
                 self.liveProgressMs = mpMs
 

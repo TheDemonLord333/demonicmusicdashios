@@ -253,7 +253,7 @@ struct MixTabView: View {
                 Text("Spotify nicht verbunden")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(DemonicColor.textSecondary)
-                Text("Im Musik-Tab anmelden oder\nandere Musik-App starten")
+                Text("Im Musik-Tab anmelden\noder Apple Music öffnen")
                     .font(.system(size: 12))
                     .foregroundColor(DemonicColor.textMuted)
                     .multilineTextAlignment(.center)

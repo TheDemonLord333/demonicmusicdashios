@@ -3,98 +3,124 @@ import Combine
 import MediaPlayer
 
 // MARK: - MediaPlayerService
-// Liest MPNowPlayingInfoCenter alle 3 Sekunden aus und simuliert
-// den Fortschritt mit einem 0.2s-Ticker (identisch zur Spotify-Logik).
+// Liest Apple Music via MPMusicPlayerController.systemMusicPlayer.
+// Benötigt Media Library Berechtigung (NSAppleMusicUsageDescription).
+// Amazon Music und andere Apps haben kein öffentliches iOS-API.
 
 @MainActor
 final class MediaPlayerService: ObservableObject {
 
     @Published var currentTrack: UnifiedTrack?
     @Published var liveProgressMs: Int = 0
-    @Published var isPlaying: Bool = false
+    @Published var authorizationStatus: MPMediaLibraryAuthorizationStatus = .notDetermined
 
-    // Ticker-Anker (wie SpotifyService)
+    // Ticker-Anker
     private var progressAnchorSec: Double = 0
     private var progressAnchorDate: Date = Date()
     private var playbackRate: Double = 0
 
-    private var pollTask: Task<Void, Never>?
+    private let player = MPMusicPlayerController.systemMusicPlayer
     private var tickerTask: Task<Void, Never>?
+    private var started = false
 
-    // MARK: - Lebenszyklus
+    // MARK: - Berechtigung anfordern + starten
 
-    func start() {
-        guard pollTask == nil else { return }
-        poll() // Sofort ein erstes Mal abfragen
-        pollTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 3_000_000_000) // 3s
-                guard !Task.isCancelled else { break }
-                poll()
+    func requestAuthorizationAndStart() {
+        let status = MPMediaLibrary.authorizationStatus()
+        authorizationStatus = status
+
+        switch status {
+        case .authorized:
+            startListening()
+        case .notDetermined:
+            MPMediaLibrary.requestAuthorization { [weak self] newStatus in
+                Task { @MainActor [weak self] in
+                    self?.authorizationStatus = newStatus
+                    if newStatus == .authorized {
+                        self?.startListening()
+                    }
+                }
             }
+        default:
+            break // verweigert — nichts tun
         }
+    }
+
+    // MARK: - Listening starten
+
+    private func startListening() {
+        guard !started else { return }
+        started = true
+
+        // Benachrichtigungen für Track- und Status-Änderungen
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(nowPlayingItemChanged),
+            name: .MPMusicPlayerControllerNowPlayingItemDidChange,
+            object: player
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playbackStateChanged),
+            name: .MPMusicPlayerControllerPlaybackStateDidChange,
+            object: player
+        )
+        player.beginGeneratingPlaybackNotifications()
+
+        // Erstmalig pollen
+        poll()
         startTicker()
     }
 
     func stop() {
-        pollTask?.cancel()
-        pollTask = nil
+        guard started else { return }
+        started = false
+        player.endGeneratingPlaybackNotifications()
+        NotificationCenter.default.removeObserver(self)
         tickerTask?.cancel()
         tickerTask = nil
         currentTrack = nil
         liveProgressMs = 0
-        isPlaying = false
     }
 
-    // MARK: - Poll
+    // MARK: - Notifications
+
+    @objc private func nowPlayingItemChanged() {
+        poll()
+    }
+
+    @objc private func playbackStateChanged() {
+        updateAnchor()
+    }
+
+    // MARK: - Poll (bei Notification oder manuell)
 
     private func poll() {
-        let info = MPNowPlayingInfoCenter.default().nowPlayingInfo
-
-        guard let info,
-              let title = info[MPMediaItemPropertyTitle] as? String,
-              !title.isEmpty
-        else {
+        guard let item = player.nowPlayingItem else {
             currentTrack = nil
-            isPlaying = false
             return
         }
 
-        let artist   = info[MPMediaItemPropertyArtist] as? String ?? ""
-        let durSec   = info[MPMediaItemPropertyPlaybackDuration] as? Double ?? 0
-        let elapsed  = info[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double ?? 0
-        let rate     = info[MPNowPlayingInfoPropertyPlaybackRate] as? Double ?? 1.0
+        let artImage = item.artwork?.image(at: CGSize(width: 400, height: 400))
 
-        // Cover-Art aus dem MediaPlayer-Framework
-        var artImage: UIImage? = nil
-        if let artwork = info[MPMediaItemPropertyArtwork] as? MPMediaItemArtwork {
-            artImage = artwork.image(at: CGSize(width: 400, height: 400))
-        }
-
-        // Quellen-Erkennung: Apple Music ↔ systemMusicPlayer
-        let appleItem = MPMusicPlayerController.systemMusicPlayer.nowPlayingItem
-        let isApple   = appleItem != nil && appleItem?.title == title
-
-        let track = UnifiedTrack(
-            title: title,
-            artist: artist,
+        currentTrack = UnifiedTrack(
+            title: item.title ?? "",
+            artist: item.artist ?? "",
             albumArtURL: nil,
             albumArtImage: artImage,
-            durationMs: Int(durSec * 1000),
-            source: isApple ? .appleMusic : .other,
+            durationMs: Int(item.playbackDuration * 1000),
+            source: .appleMusic,
             spotifyID: nil
         )
 
-        currentTrack = track
-        isPlaying = rate > 0
+        updateAnchor()
+    }
 
-        // Anker für Smooth-Ticker setzen
-        progressAnchorSec  = elapsed
+    private func updateAnchor() {
+        progressAnchorSec  = player.currentPlaybackTime
         progressAnchorDate = Date()
-        playbackRate       = rate
-
-        // Direkt aktualisieren (verhindert kurzen Sprung beim ersten Tick)
-        liveProgressMs = Int(elapsed * 1000)
+        playbackRate       = player.playbackState == .playing ? 1.0 : 0.0
+        liveProgressMs     = Int(progressAnchorSec * 1000)
     }
 
     // MARK: - Smooth-Ticker (0.2s)
@@ -103,7 +129,7 @@ final class MediaPlayerService: ObservableObject {
         tickerTask?.cancel()
         tickerTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s
+                try? await Task.sleep(nanoseconds: 200_000_000)
                 guard !Task.isCancelled else { break }
                 tick()
             }
@@ -112,12 +138,9 @@ final class MediaPlayerService: ObservableObject {
 
     private func tick() {
         guard currentTrack != nil else { return }
-        let live: Double
-        if playbackRate > 0 {
-            live = progressAnchorSec + Date().timeIntervalSince(progressAnchorDate) * playbackRate
-        } else {
-            live = progressAnchorSec
-        }
+        let live = playbackRate > 0
+            ? progressAnchorSec + Date().timeIntervalSince(progressAnchorDate) * playbackRate
+            : progressAnchorSec
         liveProgressMs = max(0, Int(live * 1000))
     }
 }
